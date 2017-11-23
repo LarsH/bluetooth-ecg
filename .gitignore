@@ -1,0 +1,7 @@
+*.obj
+*.hex
+*.map
+*.out
+*.d
+Debug
+.metadata
