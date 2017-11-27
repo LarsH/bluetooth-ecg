@@ -216,7 +216,7 @@ static PIN_Handle userPinHandle;
 static PIN_State  userPinState;
 
 PIN_Config userPinTable[] = {
-  CC2650_LAUNCHXL_ADC0 | PIN_GPIO_OUTPUT_EN | PIN_GPIO_LOW | PIN_PUSHPULL | PIN_DRVSTR_MAX,
+  CC2650_LAUNCHXL_ADC0 | PIN_INPUT_EN | PIN_PULLUP,
   PIN_TERMINATE
 };
 
@@ -714,11 +714,6 @@ void user_EcgPotentialService_ValueChangeHandler(char_data_t *pCharData)
 
       // Do something useful with pCharData->data here
       // -------------------------
-      // Set the output value equal to the received value. 0 is off, not 0 is on
-      PIN_setOutputValue(userPinHandle, CC2650_LAUNCHXL_ADC0, pCharData->data[0]);
-      Log_info2("Setting %s %s",
-                (IArg)"CC2650_LAUNCHXL_ADC0",
-                (IArg)(pCharData->data[0]?"high":"low"));
       break;
 
   default:
@@ -1024,6 +1019,41 @@ static void user_service_ValueChangeCB( uint16_t connHandle, uint16_t svcUuid,
 /*
  *  Callbacks from Hwi-context
  *****************************************************************************/
+
+/*
+ * @brief  Callback from PIN driver on interrupt
+ *
+ *         Sets in motion the debouncing.
+ *
+ * @param  handle    The PIN_Handle instance this is about
+ * @param  pinId     The pin that generated the interrupt
+ */
+static void pinHwiFxn(PIN_Handle handle, PIN_Id pinId)
+{
+  // Whether to disable Hwi for 'pinId' after handling the interrupt
+  int disableHwi = 0;
+  // Get current value of the button pin after the clock timeout
+  uint8_t pinVal = PIN_getInputValue(pinId);
+
+  Log_info1("Pin interrupt: IOID_%d", (IArg)pinId);
+
+  switch (pinId)
+  {
+    case CC2650_LAUNCHXL_ADC0:
+      // Send message to application that it should update the value of the characteristic from Task context.
+      user_enqueueCharDataMsg(APP_MSG_UPDATE_CHARVAL, 0xFFFF,
+                              ECG_POTENTIAL_SERVICE_SERV_UUID,
+                              EPS_ECG_ENABLE_ID,
+                              &pinVal, 1);
+      break;
+  }
+
+  if (disableHwi)
+  {
+    // Disable interrupt on that pin for now. Re-enabled after debounce.
+    PIN_setConfig(handle, PIN_BM_IRQ, pinId | PIN_IRQ_DIS);
+  }
+}
 
 
 /******************************************************************************
