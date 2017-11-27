@@ -65,6 +65,7 @@
 #include "gapbondmgr.h"
 
 #include "ecg_potential_service.h"
+#include <driverlib/aon_rtc.h>
 
 /*********************************************************************
  * MACROS
@@ -445,6 +446,9 @@ static bStatus_t ECG_potential_service_ReadAttrCB( uint16_t connHandle, gattAttr
 
     case EPS_ECG_POTENTIAL_MEASUREMENT_ID:
       valueLen = eps_ECG_potential_measurementValLen;
+
+      /* HACK: Writing the timestamp to the returned value */
+      *(uint16_t*) (pAttr->pValue) = 0xffff & (AONRTCCurrentCompareValueGet() > 4);
 
       Log_info4("ReadAttrCB : %s connHandle: %d offset: %d method: 0x%02x",
                  (IArg)"ECG_potential_measurement",
