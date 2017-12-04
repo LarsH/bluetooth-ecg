@@ -85,6 +85,8 @@
 #include "ecg_potential_service.h"
 
 
+#include "scif.h"
+
 /*********************************************************************
  * CONSTANTS
  */
@@ -124,6 +126,8 @@ typedef enum
   APP_MSG_GAP_STATE_CHANGE,    /* The GAP / connection state has changed      */
   APP_MSG_BUTTON_DEBOUNCED,    /* A button has been debounced with new value  */
   APP_MSG_SEND_PASSCODE,       /* A pass-code/PIN is requested during pairing */
+  APP_MSG_SC_CTRL_READY,
+  APP_MSG_SC_TASK_ALERT,
 } app_msg_types_t;
 
 // Struct for messages sent to the application task
@@ -266,6 +270,12 @@ static char *Util_getLocalNameStr(const uint8_t *data);
 static char *Util_convertArrayToHexString(uint8_t const *src, uint8_t src_len,
                                           uint8_t *dst, uint8_t dst_len);
 
+// Dusk2Dawn functions
+static void scCtrlReadyCallback(void);
+static void scTaskAlertCallback(void);
+static void processTaskAlert(void);
+
+
 /*********************************************************************
  * PROFILE CALLBACKS
  */
@@ -295,6 +305,38 @@ static EcgPotentialServiceCBs_t user_ECG_potential_serviceCBs =
   .pfnCfgChangeCb = NULL, // No notification-/indication enabled chars in ECG potential service
 };
 
+
+static void scCtrlReadyCallback(void)
+{
+  // Notify application `Control READY` is active
+  user_enqueueRawAppMsg(APP_MSG_SC_CTRL_READY, NULL, 0);
+} // scCtrlReadyCallback
+
+
+static void scTaskAlertCallback(void)
+{
+  // Notify application `Task ALERT` is active
+  user_enqueueRawAppMsg(APP_MSG_SC_TASK_ALERT, NULL, 0);
+} // scTaskAlertCallback
+
+
+static void processTaskAlert(void)
+{
+  // Clear the ALERT interrupt source
+  scifClearAlertIntSource();
+
+  // Get 'state.dawn', and set dawnStr to appropriate string
+  uint16_t dawn = scifTaskData.dusk2dawn.state.dawn;
+  char *dawnStr = (dawn != 0) ? "11" : "00";
+  // Set the dawnStr to the String characteristic in Data Service
+  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 2 , dawnStr);
+
+  // Set red LED value
+  // PIN_setOutputValue(ledPinHandle, Board_LED0, dawn);
+
+  // Acknowledge the ALERT event
+  scifAckAlertEvents();
+} // processTaskAlert
 
 
 /*********************************************************************
@@ -359,6 +401,24 @@ static void ProjectZero_init(void)
     Log_error0("Error initializing board pins");
     Task_exit();
   }
+
+  // Initialize the Sensor Controller
+  scifOsalInit();
+  scifOsalRegisterCtrlReadyCallback(scCtrlReadyCallback);
+  scifOsalRegisterTaskAlertCallback(scTaskAlertCallback);
+  scifInit(&scifDriverSetup);
+
+  // Set the Sensor Controller task tick interval to 1 second
+  uint32_t rtc_Hz = 1;  // 1Hz RTC
+  scifStartRtcTicksNow(0x00010000 / rtc_Hz);
+
+  // Configure Sensor Controller tasks
+  scifTaskData.dusk2dawn.cfg.threshold = 600;
+
+  // Start Sensor Controller task
+  scifStartTasksNbl(BV(SCIF_DUSK2DAWN_TASK_ID));
+
+
 
   // ******************************************************************
   // BLE Stack initialization
@@ -589,6 +649,13 @@ static void user_processApplicationMessage(app_msg_t *pMsg)
         GAPBondMgr_PasscodeRsp(pReq->connHandle, SUCCESS, DEFAULT_PASSCODE);
       }
       break;
+
+    case APP_MSG_SC_TASK_ALERT:
+        processTaskAlert();
+	break;
+
+    default:
+      Log_info1("Unhandled message type: %u\n", pMsg->type);
   }
 }
 
