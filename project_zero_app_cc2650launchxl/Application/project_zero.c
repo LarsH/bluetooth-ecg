@@ -326,10 +326,9 @@ static void processTaskAlert(void)
   scifClearAlertIntSource();
 
   // Get 'state.dawn', and set dawnStr to appropriate string
-  uint16_t dawn = scifTaskData.dusk2dawn.state.dawn;
-  char *dawnStr = (dawn != 0) ? "11" : "00";
+  uint16_t dawn = scifTaskData.dusk2dawn.output.adcValue;
   // Set the dawnStr to the String characteristic in Data Service
-  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 2 , dawnStr);
+  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 2 , &dawn);
 
   // Set red LED value
   // PIN_setOutputValue(ledPinHandle, Board_LED0, dawn);
@@ -409,11 +408,9 @@ static void ProjectZero_init(void)
   scifInit(&scifDriverSetup);
 
   // Set the Sensor Controller task tick interval to 1 second
-  uint32_t rtc_Hz = 1;  // 1Hz RTC
+  uint32_t rtc_Hz = 16;  // 1Hz RTC
   scifStartRtcTicksNow(0x00010000 / rtc_Hz);
 
-  // Configure Sensor Controller tasks
-  scifTaskData.dusk2dawn.cfg.threshold = 600;
 
   // Start Sensor Controller task
   scifStartTasksNbl(BV(SCIF_DUSK2DAWN_TASK_ID));
