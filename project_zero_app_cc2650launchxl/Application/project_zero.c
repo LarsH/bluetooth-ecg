@@ -178,6 +178,9 @@ static ICall_Semaphore sem;
 static Queue_Struct applicationMsgQ;
 static Queue_Handle hApplicationMsgQ;
 
+// Clock structs for periodic notification example
+static Clock_Struct eps_ECG_potential_measurement_clock;
+
 // Task configuration
 Task_Struct przTask;
 Char przTaskStack[PRZ_TASK_STACK_SIZE];
@@ -251,6 +254,7 @@ static void user_gapBondMgr_passcodeCB(uint8_t *deviceAddr, uint16_t connHandle,
 static void user_gapBondMgr_pairStateCB(uint16_t connHandle, uint8_t state,
                                         uint8_t status);
 
+static void pinHwiFxn(PIN_Handle handle, PIN_Id pinId);
 
 // Generic callback handlers for value changes in services.
 static void user_service_ValueChangeCB( uint16_t connHandle, uint16_t svcUuid, uint8_t paramID, uint8_t *pValue, uint16_t len );
@@ -258,7 +262,12 @@ static void user_service_CfgChangeCB( uint16_t connHandle, uint16_t svcUuid, uin
 
 // Task context handlers for generated services.
 static void user_EcgPotentialService_ValueChangeHandler(char_data_t *pCharData);
+static void user_EcgPotentialService_CfgChangeHandler(char_data_t *pCharData);
 
+// Callback handler(s) for the clock object(s) used to demonstrate notifications
+
+// Task handler for sending notifications.
+static void user_updateCharVal(char_data_t *pCharData);
 
 // Utility functions
 static void user_enqueueRawAppMsg(app_msg_types_t appMsgType, uint8_t *pData, uint16_t len );
@@ -302,7 +311,7 @@ static gapBondCBs_t user_bondMgrCBs =
 static EcgPotentialServiceCBs_t user_ECG_potential_serviceCBs =
 {
   .pfnChangeCb    = user_service_ValueChangeCB, // Characteristic value change callback handler
-  .pfnCfgChangeCb = NULL, // No notification-/indication enabled chars in ECG potential service
+  .pfnCfgChangeCb = user_service_CfgChangeCB, // Noti/ind configuration callback handler
 };
 
 
@@ -632,6 +641,20 @@ static void user_processApplicationMessage(app_msg_t *pMsg)
             }
             break;
 
+          case APP_MSG_SERVICE_CFG: /* Message about received CCCD write */
+            /* Call different handler per service */
+            switch(pCharData->svcUUID) {
+              case ECG_POTENTIAL_SERVICE_SERV_UUID:
+                user_EcgPotentialService_CfgChangeHandler(pCharData);
+                break;
+            }
+            break;
+
+          case APP_MSG_UPDATE_CHARVAL: /* Message to self from to update a value */
+            user_updateCharVal(pCharData);
+            break;
+
+
     case APP_MSG_GAP_STATE_CHANGE: /* Message that GAP state changed  */
       user_processGapStateChangeEvt( *(gaprole_States_t *)pMsg->pdu );
       break;
@@ -730,10 +753,16 @@ static void user_processGapStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_WAITING:
+
+      // Turn off periodic clocks for ind/noti demo
+      Clock_stop((Clock_Handle)&eps_ECG_potential_measurement_clock);
       Log_info0("Disconnected / Idle");
       break;
 
     case GAPROLE_WAITING_AFTER_TIMEOUT:
+
+      // Turn off periodic clocks for ind/noti demo
+      Clock_stop((Clock_Handle)&eps_ECG_potential_measurement_clock);
       Log_info0("Connection timed out");
       break;
 
@@ -778,6 +807,57 @@ void user_EcgPotentialService_ValueChangeHandler(char_data_t *pCharData)
 
       // Do something useful with pCharData->data here
       // -------------------------
+      break;
+
+  default:
+    return;
+  }
+}
+
+/*
+ * @brief   Handle a CCCD (configuration change) write received from a peer
+ *          device. This tells us whether the peer device wants us to send
+ *          Notifications or Indications.
+ *
+ * @param   pCharData  pointer to malloc'd char write data
+ *
+ * @return  None.
+ */
+void user_EcgPotentialService_CfgChangeHandler(char_data_t *pCharData)
+{
+  // Cast received data to uint16, as that's the format for CCCD writes.
+  uint16_t configValue = *(uint16_t *)pCharData->data;
+  char *configValString;
+
+  // Determine what to tell the user
+  switch(configValue)
+  {
+  case GATT_CFG_NO_OPERATION:
+    configValString = "Noti/Ind disabled";
+    break;
+  case GATT_CLIENT_CFG_NOTIFY:
+    configValString = "Notifications enabled";
+    break;
+  case GATT_CLIENT_CFG_INDICATE:
+    configValString = "Indications enabled";
+    break;
+  }
+
+  switch (pCharData->paramID)
+  {
+    case EPS_ECG_POTENTIAL_MEASUREMENT_ID:
+      Log_info3("CCCD Change msg: %s %s: %s",
+                (IArg)"ECG potential service",
+                (IArg)"ECG potential measurement",
+                (IArg)configValString);
+      // -------------------------
+      // Do something useful with configValue here. It tells you whether someone
+      // wants to know the state of this characteristic.
+      // ... In the generated example we turn periodic clocks on/off
+      if (configValue) // 0x0001 and 0x0002 both indicate turned on.
+        Clock_start((Clock_Handle)&eps_ECG_potential_measurement_clock);
+      else
+        Clock_stop((Clock_Handle)&eps_ECG_potential_measurement_clock);
       break;
 
   default:
@@ -1073,6 +1153,19 @@ static void user_service_ValueChangeCB( uint16_t connHandle, uint16_t svcUuid,
             "Sending msg to app.", (IArg)svcUuid, (IArg)paramID);
   user_enqueueCharDataMsg(APP_MSG_SERVICE_WRITE, connHandle, svcUuid, paramID,
                           pValue, len);
+}
+
+/**
+ * Callback handler for characteristic configuration changes in services.
+ */
+static void user_service_CfgChangeCB( uint16_t connHandle, uint16_t svcUuid,
+                                      uint8_t paramID, uint8_t *pValue,
+                                      uint16_t len )
+{
+  Log_info2("(CB) Char config change: svc(0x%04x) paramID(%d). "
+            "Sending msg to app.", (IArg)svcUuid, (IArg)paramID);
+  user_enqueueCharDataMsg(APP_MSG_SERVICE_CFG, connHandle, svcUuid,
+                          paramID, pValue, len);
 }
 
 /*

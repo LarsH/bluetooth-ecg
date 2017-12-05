@@ -113,6 +113,7 @@ CONST uint8_t eps_Sensor_PlacementUUID[ATT_UUID_SIZE] =
  */
 
 static EcgPotentialServiceCBs_t *pAppCBs = NULL;
+static uint8_t eps_icall_rsp_task_id = INVALID_TASK_ID;
 
 /*********************************************************************
 * Profile Attributes - variables
@@ -133,13 +134,16 @@ static uint16_t eps_ECG_enableValLen = EPS_ECG_ENABLE_LEN_MIN;
 
 
 // Characteristic "ECG potential measurement" Properties (for declaration)
-static uint8_t eps_ECG_potential_measurementProps = GATT_PROP_READ;
+static uint8_t eps_ECG_potential_measurementProps = GATT_PROP_NOTIFY | GATT_PROP_READ;
 
 // Characteristic "ECG potential measurement" Value variable
 static uint8_t eps_ECG_potential_measurementVal[EPS_ECG_POTENTIAL_MEASUREMENT_LEN] = {0};
 
 // Length of data in characteristic "ECG potential measurement" Value variable, initialized to minimal size.
 static uint16_t eps_ECG_potential_measurementValLen = EPS_ECG_POTENTIAL_MEASUREMENT_LEN_MIN;
+
+// Characteristic "ECG potential measurement" Client Characteristic Configuration Descriptor
+static gattCharCfg_t *eps_ECG_potential_measurementConfig;
 
 
 
@@ -195,6 +199,13 @@ static gattAttribute_t ECG_potential_serviceAttrTbl[] =
         0,
         eps_ECG_potential_measurementVal
       },
+      // ECG potential measurement CCCD
+      {
+        { ATT_BT_UUID_SIZE, clientCharCfgUUID },
+        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        0,
+        (uint8_t *)&eps_ECG_potential_measurementConfig
+      },
     // Sensor Placement Characteristic Declaration
     {
       { ATT_BT_UUID_SIZE, characterUUID },
@@ -246,12 +257,23 @@ extern bStatus_t EcgPotentialService_AddService( uint8_t rspTaskId )
 {
   uint8_t status;
 
+  // Allocate Client Characteristic Configuration table
+  eps_ECG_potential_measurementConfig = (gattCharCfg_t *)ICall_malloc( sizeof(gattCharCfg_t) * linkDBNumConns );
+  if ( eps_ECG_potential_measurementConfig == NULL )
+  {
+    return ( bleMemAllocError );
+  }
+
+  // Initialize Client Characteristic Configuration attributes
+  GATTServApp_InitCharCfg( INVALID_CONNHANDLE, eps_ECG_potential_measurementConfig );
   // Register GATT attribute list and CBs with GATT Server App
   status = GATTServApp_RegisterService( ECG_potential_serviceAttrTbl,
                                         GATT_NUM_ATTRS( ECG_potential_serviceAttrTbl ),
                                         GATT_MAX_ENCRYPT_KEY_SIZE,
                                         &ECG_potential_serviceCBs );
   Log_info1("Registered service, %d attributes", (IArg)GATT_NUM_ATTRS( ECG_potential_serviceAttrTbl ));
+  eps_icall_rsp_task_id = rspTaskId;
+
   return ( status );
 }
 
@@ -293,6 +315,9 @@ bStatus_t EcgPotentialService_SetParameter( uint8_t param, uint16_t len, void *v
   uint16_t *pValLen;
   uint16_t valMinLen;
   uint16_t valMaxLen;
+  uint8_t sendNotiInd = FALSE;
+  gattCharCfg_t *attrConfig;
+  uint8_t needAuth = TRUE;
 
   switch ( param )
   {
@@ -309,6 +334,9 @@ bStatus_t EcgPotentialService_SetParameter( uint8_t param, uint16_t len, void *v
       pValLen   = &eps_ECG_potential_measurementValLen;
       valMinLen =  EPS_ECG_POTENTIAL_MEASUREMENT_LEN_MIN;
       valMaxLen =  EPS_ECG_POTENTIAL_MEASUREMENT_LEN;
+      sendNotiInd = TRUE;
+      attrConfig  = eps_ECG_potential_measurementConfig;
+      needAuth    = FALSE; // Change if authenticated link is required for sending.
       Log_info2("SetParameter : %s len: %d", (IArg)"ECG_potential_measurement", (IArg)len);
       break;
 
@@ -330,6 +358,19 @@ bStatus_t EcgPotentialService_SetParameter( uint8_t param, uint16_t len, void *v
   {
     memcpy(pAttrVal, value, len);
     *pValLen = len; // Update length for read and get.
+
+    if (sendNotiInd)
+    {
+      Log_info2("Trying to send noti/ind: connHandle %x, %s",
+                (IArg)attrConfig[0].connHandle,
+                (IArg)((attrConfig[0].value==0)?"\x1b[33mNoti/ind disabled\x1b[0m" :
+                       (attrConfig[0].value==1)?"Notification enabled" :
+                                                "Indication enabled"));
+      // Try to send notification.
+      GATTServApp_ProcessCharCfg( attrConfig, pAttrVal, needAuth,
+                                  ECG_potential_serviceAttrTbl, GATT_NUM_ATTRS( ECG_potential_serviceAttrTbl ),
+                                  eps_icall_rsp_task_id,  ECG_potential_service_ReadAttrCB);
+    }
   }
   else
   {
@@ -509,6 +550,20 @@ static bStatus_t ECG_potential_service_WriteAttrCB( uint16_t connHandle, gattAtt
   uint16_t writeLenMin;
   uint16_t writeLenMax;
   uint16_t *pValueLenVar;
+
+  // See if request is regarding a Client Characterisic Configuration
+  if (ATT_BT_UUID_SIZE == pAttr->type.len && GATT_CLIENT_CHAR_CFG_UUID == *(uint16_t *)pAttr->type.uuid)
+  {
+    // Allow notification and indication, but do not check if really allowed per CCCD.
+    status = GATTServApp_ProcessCCCWriteReq( connHandle, pAttr, pValue, len,
+                                             offset, GATT_CLIENT_CFG_NOTIFY |
+                                                     GATT_CLIENT_CFG_INDICATE );
+    if (SUCCESS == status && pAppCBs && pAppCBs->pfnCfgChangeCb)
+       pAppCBs->pfnCfgChangeCb( connHandle, ECG_POTENTIAL_SERVICE_SERV_UUID,
+                                ECG_potential_service_findCharParamId(pAttr), pValue, len );
+
+     return status;
+  }
 
   // Find settings for the characteristic to be written.
   paramID = ECG_potential_service_findCharParamId( pAttr );
