@@ -54,6 +54,7 @@ extern "C"
  * INCLUDES
  */
 #include <bcomdef.h>
+#include "scif.h"
 
 /*********************************************************************
  * CONSTANTS
@@ -73,8 +74,8 @@ extern "C"
 #define EPS_ECG_POTENTIAL_MEASUREMENT_ID                 1
 #define EPS_ECG_POTENTIAL_MEASUREMENT_UUID               0x1122
 #define EPS_ECG_POTENTIAL_MEASUREMENT_UUID_BASE128(uuid) 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB0, 0x00, 0x40, 0x51, 0x04, LO_UINT16(uuid), HI_UINT16(uuid), 0x00, 0xF0
-#define EPS_ECG_POTENTIAL_MEASUREMENT_LEN                2
-#define EPS_ECG_POTENTIAL_MEASUREMENT_LEN_MIN            2
+#define EPS_ECG_POTENTIAL_MEASUREMENT_LEN                sizeof(scifTaskData.dusk2dawn.output.adcValue)
+#define EPS_ECG_POTENTIAL_MEASUREMENT_LEN_MIN            sizeof(scifTaskData.dusk2dawn.output.adcValue)
 
 // Sensor Placement Characteristic defines
 #define EPS_SENSOR_PLACEMENT_ID                 2

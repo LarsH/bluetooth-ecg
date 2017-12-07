@@ -334,10 +334,11 @@ static void processTaskAlert(void)
   // Clear the ALERT interrupt source
   scifClearAlertIntSource();
 
-  // Get 'state.dawn', and set dawnStr to appropriate string
-  uint16_t dawn = scifTaskData.dusk2dawn.output.adcValue;
   // Set the dawnStr to the String characteristic in Data Service
-  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 2 , &dawn);
+  // We are ignoring the volatile keyword here!
+  // Hopefully this won't lead to problems, but if so: copy the values
+  // to an array that does not risk to be changed during this call.
+  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , sizeof(scifTaskData.dusk2dawn.output.adcValue), scifTaskData.dusk2dawn.output.adcValue);
 
   // Set red LED value
   // PIN_setOutputValue(ledPinHandle, Board_LED0, dawn);
