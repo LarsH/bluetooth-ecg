@@ -84,6 +84,8 @@
 // Bluetooth Developer Studio services
 #include "ecg_potential_service.h"
 
+#include <driverlib/aon_rtc.h>
+
 
 #include "scif.h"
 
@@ -331,17 +333,20 @@ static void scTaskAlertCallback(void)
 
 static void processTaskAlert(void)
 {
+  int i;
+  struct {
+	  uint32_t timestamp;
+	  uint16_t data[8];
+  } dataToSend;
+
   // Clear the ALERT interrupt source
   scifClearAlertIntSource();
 
-  // Set the dawnStr to the String characteristic in Data Service
-  // We are ignoring the volatile keyword here!
-  // Hopefully this won't lead to problems, but if so: copy the values
-  // to an array that does not risk to be changed during this call.
-  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , sizeof(scifTaskData.dusk2dawn.output.adcValue), scifTaskData.dusk2dawn.output.adcValue);
-
-  // Set red LED value
-  // PIN_setOutputValue(ledPinHandle, Board_LED0, dawn);
+  dataToSend.timestamp = AONRTCCurrentCompareValueGet();
+  for(i=0; i<8; i++) {
+	  dataToSend.data[i] = scifTaskData.dusk2dawn.output.adcValue[i];
+  }
+  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 20, &dataToSend );
 
   // Acknowledge the ALERT event
   scifAckAlertEvents();
