@@ -83,7 +83,7 @@
 
 // Bluetooth Developer Studio services
 #include "ecg_potential_service.h"
-
+#include "ecg_buffer.h"
 #include <driverlib/aon_rtc.h>
 
 
@@ -331,22 +331,45 @@ static void scTaskAlertCallback(void)
 } // scTaskAlertCallback
 
 
+static int isADCenabled = 1;
 static void processTaskAlert(void)
 {
   int i;
-  struct {
-	  uint32_t timestamp;
-	  uint16_t data[8];
-  } dataToSend;
+  ecg_data_t dataToSend;
 
   // Clear the ALERT interrupt source
   scifClearAlertIntSource();
 
   dataToSend.timestamp = AONRTCCurrentCompareValueGet();
-  for(i=0; i<8; i++) {
-	  dataToSend.data[i] = scifTaskData.dusk2dawn.output.adcValue[i];
+  for(i=0; i<sizeof(dataToSend.data)/sizeof(*(dataToSend.data)); i++) {
+      dataToSend.data[i] = scifTaskData.dusk2dawn.output.adcValue[i];
   }
-  EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 20, &dataToSend );
+
+  if(isADCenabled) {
+      int isBufferFull = buffer_put(&dataToSend);
+
+      if (isBufferFull) {
+          isADCenabled = 0;
+          requestNewData();
+      }
+  }
+
+  if (!isADCenabled) {
+      /* This clause is run immediately when isADCenabled goes to false!
+       * (should not be an else to previous if-statement)
+       */
+      if(shouldSendNewData())
+      {
+          ecg_data_t tmp;
+          buffer_get(&tmp);
+          EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 20, &tmp );
+      }
+        if(buffer_isEmpty()) {
+          /* Can be triggered both from writing to BLE-enable characteristic, or by sending all available data.
+           */
+          isADCenabled = 1;
+      }
+  }
 
   // Acknowledge the ALERT event
   scifAckAlertEvents();
@@ -423,7 +446,7 @@ static void ProjectZero_init(void)
   scifInit(&scifDriverSetup);
 
   // Set the Sensor Controller task tick interval to 1 second
-  uint32_t rtc_Hz = 16;  // 1Hz RTC
+  uint32_t rtc_Hz = 1024;  // 1Hz RTC
   scifStartRtcTicksNow(0x00010000 / rtc_Hz);
 
 
