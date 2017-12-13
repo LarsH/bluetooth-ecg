@@ -418,6 +418,25 @@ static void ProjectZero_init(void)
 
   Log_info0("Initializing the user task, hardware, BLE stack and services.");
 
+#if 0
+  Log_info0("Testing buffer:");
+  /* The log buffer fills up, so log messages are dropped!
+   * Is there a nice way to flush the log buffer?
+   */ 
+  ecg_data_t testData;
+  int i;
+  for(i=0; i<5;i ++) {
+	  testData.timestamp = i;
+	  int isBufferFull = buffer_put(&testData);
+	  Log_info2("Test %u: put: %u", i, isBufferFull);
+  }
+  for(i=0; i<10;i ++) {
+	  int isBufferEmpty = buffer_get(&testData);
+	  Log_info2("Test %u: get: %u", testData.timestamp, isBufferEmpty);
+  }
+#endif
+
+
   // Open display. By default this is disabled via the predefined symbol Display_DISABLE_ALL.
   dispHandle = Display_open(Display_Type_LCD, NULL);
 

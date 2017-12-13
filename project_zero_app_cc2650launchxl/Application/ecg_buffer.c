@@ -1,4 +1,5 @@
 #include "ecg_buffer.h"
+#include <xdc/runtime/Log.h>
 
 #define ECG_BUF_SIZE (64)
 
@@ -13,14 +14,18 @@ static ecg_data_t buffer_data[ECG_BUF_SIZE];
  * Returns zero on success, non-zero on failure (buffer full).
  */
 int buffer_put(ecg_data_t* value) {
+	//Log_info2("Put %u,%u", readIdx, writeIdx);
 	if(len >= ECG_BUF_SIZE) {
 		/* Buffer is already full */
 		return 1;
 	}
-	memcpy(&buffer_data[writeIdx], value, sizeof(*value));
+	memcpy(&buffer_data[writeIdx], value, sizeof(ecg_data_t));
 	writeIdx = (writeIdx + 1) % ECG_BUF_SIZE;
 	len += 1;
 
+	while(len != (writeIdx + ECG_BUF_SIZE - readIdx)%ECG_BUF_SIZE) {
+		/* Fail! */ ;
+	}
 	return 0;
 }
 
@@ -29,13 +34,18 @@ int buffer_put(ecg_data_t* value) {
  * Returns zero on success, non-zero on failure (buffer empty).
  */
 int buffer_get(ecg_data_t *dest) {
+	//Log_info2("Get %u,%u", readIdx, writeIdx);
 	if(len == 0) {
 		/* Buffer is empty */
 		return 1;
 	}
-	memcpy(dest, &buffer_data[readIdx], sizeof(*dest));
+	memcpy(dest, &buffer_data[readIdx], sizeof(ecg_data_t));
 	readIdx = (readIdx + 1) % ECG_BUF_SIZE;
 	len -= 1;
+
+	while(len != (writeIdx + ECG_BUF_SIZE - readIdx)%ECG_BUF_SIZE) {
+		/* Fail! */ ;
+	}
 
 	return 0;
 }
