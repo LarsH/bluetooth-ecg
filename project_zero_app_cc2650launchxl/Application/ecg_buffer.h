@@ -12,3 +12,7 @@ int buffer_isEmpty(void);
 
 void requestNewData(void);
 int shouldSendNewData(void);
+
+void setADCstore(int);
+int shouldADCstore(void);
+

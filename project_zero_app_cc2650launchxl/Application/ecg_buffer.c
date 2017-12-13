@@ -81,3 +81,13 @@ int shouldSendNewData(void) {
 	shouldSend = 0;
 	return retval;
 }
+
+static int shouldStore = 0;
+void setADCstore(int v) {
+	Log_info1("ADCstore := %u", v);
+	shouldStore = v;
+}
+int shouldADCstore(void) {
+	return shouldStore;
+}
+

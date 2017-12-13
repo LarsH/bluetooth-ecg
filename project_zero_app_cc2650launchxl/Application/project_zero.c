@@ -328,8 +328,6 @@ static void scTaskAlertCallback(void)
   user_enqueueRawAppMsg(APP_MSG_SC_TASK_ALERT, NULL, 0);
 } // scTaskAlertCallback
 
-
-static int isADCenabled = 1;
 static void processTaskAlert(void)
 {
   int i;
@@ -343,29 +341,29 @@ static void processTaskAlert(void)
       dataToSend.data[i] = scifTaskData.dusk2dawn.output.adcValue[i];
   }
 
-  if(isADCenabled) {
+  if(shouldADCstore()) {
+      Log_info0("Reading ADC value.");
       int isBufferFull = buffer_put(&dataToSend);
 
       if (isBufferFull) {
-          isADCenabled = 0;
+          Log_info0("ADC buffer full, done measuring.");
+          setADCstore(0);
           requestNewData();
       }
   }
 
-  if (!isADCenabled) {
-      /* This clause is run immediately when isADCenabled goes to false!
-       * (should not be an else to previous if-statement)
-       */
-      if(shouldSendNewData())
-      {
+  if(shouldSendNewData())
+  {
+      if(buffer_isEmpty()) {
+          Log_info0("ADC buffer empty, done sending.");
+          uint8_t tmp[1] = {0};
+          EcgPotentialService_SetParameter ( EPS_ECG_ENABLE_ID , 1, &tmp );
+      }
+      else {
+          Log_info0("Sending ADC data...");
           ecg_data_t tmp;
           buffer_get(&tmp);
           EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 20, &tmp );
-      }
-        if(buffer_isEmpty()) {
-          /* Can be triggered both from writing to BLE-enable characteristic, or by sending all available data.
-           */
-          isADCenabled = 1;
       }
   }
 

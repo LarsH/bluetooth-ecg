@@ -584,8 +584,8 @@ static bStatus_t ECG_potential_service_WriteAttrCB( uint16_t connHandle, gattAtt
                  (IArg)method);
       /* Other considerations for ECG enable can be inserted here */
       if(pAttr->pValue[0] != '\x00') {
-          /* Received enable from phone, clear buffer */
-          buffer_clear();
+          /* Received enable from phone, enable measuring */
+          setADCstore(1);
       }
 
       break;
