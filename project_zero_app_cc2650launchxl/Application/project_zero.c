@@ -256,8 +256,6 @@ static void user_gapBondMgr_passcodeCB(uint8_t *deviceAddr, uint16_t connHandle,
 static void user_gapBondMgr_pairStateCB(uint16_t connHandle, uint8_t state,
                                         uint8_t status);
 
-static void pinHwiFxn(PIN_Handle handle, PIN_Id pinId);
-
 // Generic callback handlers for value changes in services.
 static void user_service_ValueChangeCB( uint16_t connHandle, uint16_t svcUuid, uint8_t paramID, uint8_t *pValue, uint16_t len );
 static void user_service_CfgChangeCB( uint16_t connHandle, uint16_t svcUuid, uint8_t paramID, uint8_t *pValue, uint16_t len );
@@ -1200,46 +1198,6 @@ static void user_service_CfgChangeCB( uint16_t connHandle, uint16_t svcUuid,
 /*
  *  Callbacks from Swi-context
  *****************************************************************************/
-
-
-/*
- *  Callbacks from Hwi-context
- *****************************************************************************/
-
-/*
- * @brief  Callback from PIN driver on interrupt
- *
- *         Sets in motion the debouncing.
- *
- * @param  handle    The PIN_Handle instance this is about
- * @param  pinId     The pin that generated the interrupt
- */
-static void pinHwiFxn(PIN_Handle handle, PIN_Id pinId)
-{
-  // Whether to disable Hwi for 'pinId' after handling the interrupt
-  int disableHwi = 0;
-  // Get current value of the button pin after the clock timeout
-  uint8_t pinVal = PIN_getInputValue(pinId);
-
-  Log_info1("Pin interrupt: IOID_%d", (IArg)pinId);
-
-  switch (pinId)
-  {
-    case CC2650_LAUNCHXL_ADC0:
-      // Send message to application that it should update the value of the characteristic from Task context.
-      user_enqueueCharDataMsg(APP_MSG_UPDATE_CHARVAL, 0xFFFF,
-                              ECG_POTENTIAL_SERVICE_SERV_UUID,
-                              EPS_ECG_ENABLE_ID,
-                              &pinVal, 1);
-      break;
-  }
-
-  if (disableHwi)
-  {
-    // Disable interrupt on that pin for now. Re-enabled after debounce.
-    PIN_setConfig(handle, PIN_BM_IRQ, pinId | PIN_IRQ_DIS);
-  }
-}
 
 
 /******************************************************************************
