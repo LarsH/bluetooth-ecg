@@ -23,7 +23,7 @@ int buffer_put(ecg_data_t* value) {
 	writeIdx = (writeIdx + 1) % ECG_BUF_SIZE;
 	len += 1;
 
-	while(len != (writeIdx + ECG_BUF_SIZE - readIdx)%ECG_BUF_SIZE) {
+	while(len%ECG_BUF_SIZE != (writeIdx + ECG_BUF_SIZE - readIdx)%ECG_BUF_SIZE) {
 		/* Fail! */ ;
 	}
 	return 0;
@@ -43,7 +43,7 @@ int buffer_get(ecg_data_t *dest) {
 	readIdx = (readIdx + 1) % ECG_BUF_SIZE;
 	len -= 1;
 
-	while(len != (writeIdx + ECG_BUF_SIZE - readIdx)%ECG_BUF_SIZE) {
+	while(len%ECG_BUF_SIZE != (writeIdx + ECG_BUF_SIZE - readIdx)%ECG_BUF_SIZE) {
 		/* Fail! */ ;
 	}
 
