@@ -83,6 +83,13 @@ extern "C"
 #define EPS_SENSOR_PLACEMENT_LEN                1
 #define EPS_SENSOR_PLACEMENT_LEN_MIN            1
 
+// Ack Characteristic defines
+#define EPS_ACK_ID                 3
+#define EPS_ACK_UUID               0x1124
+#define EPS_ACK_UUID_BASE128(uuid) 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB0, 0x00, 0x40, 0x51, 0x04, LO_UINT16(uuid), HI_UINT16(uuid), 0x00, 0xF0
+#define EPS_ACK_LEN                1
+#define EPS_ACK_LEN_MIN            1
+
 /*********************************************************************
  * TYPEDEFS
  */
@@ -108,6 +115,8 @@ extern "C"
 //       Ear lobe -- 5
 //       Foot -- 6
 
+
+// Fields in characteristic "Ack"
 
 /*********************************************************************
  * MACROS

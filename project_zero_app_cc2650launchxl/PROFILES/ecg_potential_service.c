@@ -109,6 +109,12 @@ CONST uint8_t eps_Sensor_PlacementUUID[ATT_UUID_SIZE] =
   EPS_SENSOR_PLACEMENT_UUID_BASE128(EPS_SENSOR_PLACEMENT_UUID)
 };
 
+// Ack UUID
+CONST uint8_t eps_AckUUID[ATT_UUID_SIZE] =
+{
+  EPS_ACK_UUID_BASE128(EPS_ACK_UUID)
+};
+
 
 /*********************************************************************
  * LOCAL VARIABLES
@@ -157,6 +163,17 @@ static uint8_t eps_Sensor_PlacementVal[EPS_SENSOR_PLACEMENT_LEN] = {0};
 
 // Length of data in characteristic "Sensor Placement" Value variable, initialized to minimal size.
 static uint16_t eps_Sensor_PlacementValLen = EPS_SENSOR_PLACEMENT_LEN_MIN;
+
+
+
+// Characteristic "Ack" Properties (for declaration)
+static uint8_t eps_AckProps = GATT_PROP_READ | GATT_PROP_WRITE | GATT_PROP_WRITE_NO_RSP;
+
+// Characteristic "Ack" Value variable
+static uint8_t eps_AckVal[EPS_ACK_LEN] = {0};
+
+// Length of data in characteristic "Ack" Value variable, initialized to minimal size.
+static uint16_t eps_AckValLen = EPS_ACK_LEN_MIN;
 
 
 
@@ -221,6 +238,20 @@ static gattAttribute_t ECG_potential_serviceAttrTbl[] =
         GATT_PERMIT_READ,
         0,
         eps_Sensor_PlacementVal
+      },
+    // Ack Characteristic Declaration
+    {
+      { ATT_BT_UUID_SIZE, characterUUID },
+      GATT_PERMIT_READ,
+      0,
+      &eps_AckProps
+    },
+      // Ack Characteristic Value
+      {
+        { ATT_UUID_SIZE, eps_AckUUID },
+        GATT_PERMIT_READ | GATT_PERMIT_WRITE | GATT_PERMIT_WRITE,
+        0,
+        eps_AckVal
       },
 };
 
@@ -350,6 +381,14 @@ bStatus_t EcgPotentialService_SetParameter( uint8_t param, uint16_t len, void *v
       Log_info2("SetParameter : %s len: %d", (IArg)"Sensor_Placement", (IArg)len);
       break;
 
+    case EPS_ACK_ID:
+      pAttrVal  =  eps_AckVal;
+      pValLen   = &eps_AckValLen;
+      valMinLen =  EPS_ACK_LEN_MIN;
+      valMaxLen =  EPS_ACK_LEN;
+      Log_info2("SetParameter : %s len: %d", (IArg)"Ack", (IArg)len);
+      break;
+
     default:
       Log_error1("SetParameter: Parameter #%d not valid.", (IArg)param);
       return INVALIDPARAMETER;
@@ -406,6 +445,12 @@ bStatus_t EcgPotentialService_GetParameter( uint8_t param, uint16_t *len, void *
       Log_info2("GetParameter : %s returning %d bytes", (IArg)"ECG_enable", (IArg)*len);
       break;
 
+    case EPS_ACK_ID:
+      *len = MIN(*len, eps_AckValLen);
+      memcpy(value, eps_AckVal, *len);
+      Log_info2("GetParameter : %s returning %d bytes", (IArg)"Ack", (IArg)*len);
+      break;
+
     default:
       Log_error1("GetParameter: Parameter #%d not valid.", (IArg)param);
       ret = INVALIDPARAMETER;
@@ -444,6 +489,10 @@ static uint8_t ECG_potential_service_findCharParamId(gattAttribute_t *pAttr)
   // Is this attribute in "Sensor Placement"?
   else if ( ATT_UUID_SIZE == pAttr->type.len && !memcmp(pAttr->type.uuid, eps_Sensor_PlacementUUID, pAttr->type.len))
     return EPS_SENSOR_PLACEMENT_ID;
+
+  // Is this attribute in "Ack"?
+  else if ( ATT_UUID_SIZE == pAttr->type.len && !memcmp(pAttr->type.uuid, eps_AckUUID, pAttr->type.len))
+    return EPS_ACK_ID;
 
   else
     return 0xFF; // Not found. Return invalid.
@@ -507,6 +556,17 @@ static bStatus_t ECG_potential_service_ReadAttrCB( uint16_t connHandle, gattAttr
                  (IArg)offset,
                  (IArg)method);
       /* Other considerations for Sensor Placement can be inserted here */
+      break;
+
+    case EPS_ACK_ID:
+      valueLen = eps_AckValLen;
+
+      Log_info4("ReadAttrCB : %s connHandle: %d offset: %d method: 0x%02x",
+                 (IArg)"Ack",
+                 (IArg)connHandle,
+                 (IArg)offset,
+                 (IArg)method);
+      /* Other considerations for Ack can be inserted here */
       break;
 
     default:
@@ -584,7 +644,20 @@ static bStatus_t ECG_potential_service_WriteAttrCB( uint16_t connHandle, gattAtt
                  (IArg)method);
       /* Other considerations for ECG enable can be inserted here */
       setADCstore(1);       /* Received enable from phone, enable measuring */
+      break;
 
+    case EPS_ACK_ID:
+      writeLenMin  = EPS_ACK_LEN_MIN;
+      writeLenMax  = EPS_ACK_LEN;
+      pValueLenVar = &eps_AckValLen;
+
+      Log_info5("WriteAttrCB : %s connHandle(%d) len(%d) offset(%d) method(0x%02x)",
+                 (IArg)"Ack",
+                 (IArg)connHandle,
+                 (IArg)len,
+                 (IArg)offset,
+                 (IArg)method);
+      /* Other considerations for Ack can be inserted here */
       break;
 
     default:

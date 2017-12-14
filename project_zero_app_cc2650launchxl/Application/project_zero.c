@@ -551,6 +551,7 @@ static void ProjectZero_init(void)
   EcgPotentialService_SetParameter(EPS_ECG_ENABLE_ID, EPS_ECG_ENABLE_LEN, &someVal);
   EcgPotentialService_SetParameter(EPS_ECG_POTENTIAL_MEASUREMENT_ID, EPS_ECG_POTENTIAL_MEASUREMENT_LEN, &someVal);
   EcgPotentialService_SetParameter(EPS_SENSOR_PLACEMENT_ID, EPS_SENSOR_PLACEMENT_LEN, &someVal);
+  EcgPotentialService_SetParameter(EPS_ACK_ID, EPS_ACK_LEN, &someVal);
 
 
 
@@ -847,6 +848,16 @@ void user_EcgPotentialService_ValueChangeHandler(char_data_t *pCharData)
       Log_info3("Value Change msg: %s %s: %s",
                 (IArg)"ECG potential service",
                 (IArg)"ECG enable",
+                (IArg)pretty_data_holder);
+
+      // Do something useful with pCharData->data here
+      // -------------------------
+      break;
+
+    case EPS_ACK_ID:
+      Log_info3("Value Change msg: %s %s: %s",
+                (IArg)"ECG potential service",
+                (IArg)"Ack",
                 (IArg)pretty_data_holder);
 
       // Do something useful with pCharData->data here
