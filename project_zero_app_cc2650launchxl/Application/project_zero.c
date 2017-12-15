@@ -364,9 +364,11 @@ static void processTaskAlert(void)
       }
       else {
           Log_info0("Sending ADC data...");
-          ecg_data_t tmp;
-          buffer_get(&tmp);
-          EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 20, &tmp );
+          ecg_data_t data[20/sizeof(ecg_data_t)];
+          for(int i=0; i<sizeof(data)/sizeof(ecg_data_t); i++) {
+              buffer_get(&(data[i]));
+          }
+          EcgPotentialService_SetParameter ( EPS_ECG_POTENTIAL_MEASUREMENT_ID , 20, data);
       }
   }
 
