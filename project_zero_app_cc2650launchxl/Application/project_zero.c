@@ -336,7 +336,10 @@ static void processTaskAlert(void)
   // Clear the ALERT interrupt source
   scifClearAlertIntSource();
 
+#if ECG_BUFFER_USE_TIMESTAMP != 0
   dataToSend.timestamp = AONRTCCurrentCompareValueGet();
+#endif
+
   for(i=0; i<sizeof(dataToSend.data)/sizeof(*(dataToSend.data)); i++) {
       dataToSend.data[i] = scifTaskData.dusk2dawn.output.adcValue[i];
   }
