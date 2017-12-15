@@ -466,7 +466,7 @@ static void ProjectZero_init(void)
   scifInit(&scifDriverSetup);
 
   // Set the Sensor Controller task tick interval to 1 second
-  uint32_t rtc_Hz = 1024;  // 1Hz RTC
+  uint32_t rtc_Hz = 256;  // 1Hz RTC
   scifStartRtcTicksNow(0x00010000 / rtc_Hz);
 
 

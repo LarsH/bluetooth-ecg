@@ -1,7 +1,8 @@
 #include "ecg_buffer.h"
 #include <xdc/runtime/Log.h>
 
-#define ECG_BUF_SIZE (64)
+/* Make this as large as possible, depends on total RAM in system */
+#define ECG_BUF_SIZE (1024)
 
 static unsigned int writeIdx = 0;
 static unsigned int readIdx = 0;
